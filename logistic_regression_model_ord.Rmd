@@ -1,0 +1,231 @@
+---
+title: "sports_model"
+output: html_document
+---
+
+```{r data import, include=FALSE}
+
+setwd("C:/Users/korea/workspace/sportsdata/korea_fdal_minhyung/input_data/자체 제작 데이터셋/")
+original_data = read.csv("original_data_0901.csv")
+dan_data = read.csv("dan_data_0901.csv")
+bok_data = read.csv("bok_data_0901.csv")
+sam_data = read.csv("sam_data_0901.csv")
+
+```
+
+
+############### 단승식 #################
+
+```{r logistic model}
+library(caret)
+library(e1071)
+
+null_model <- glm(ord ~ 1, data = dan_data)
+
+AIC <- step(null_model,scope = (ord ~ chulNo + age + wgBudam + rcCntY + ord1CntY + ord2CntY + rank + chaksunT + chaksunY + chaksun_6m  + trAge + rcCntY_tr + ord1CntY_tr + ord2CntY_tr + age_jk + wg_Budam_jk + rcCntY_jk + ord1CntY_jk + ord2CntY_jk + num_own + num_reg + num_cancel + chaksunT_ow + chaksunY_ow + ord1CntY_ow + ord2CntY_ow + ord3CntY_ow + rcCntY_ow + hr_ord1PerT + hr_ord2PerT + tr_ord1PerT + tr_ord2PerT + jk_ord1PerT + jk_ord2PerT + ow_ord1PerT + ow_ord2PerT + ow_ord3PerT + tr_career + jk_career + ow_career + sex_female + sex_gelding + sex_male + name_domestic + name_foreign), direction = "both")
+
+summary(AIC)
+
+result_matrix_test_linear <- matrix(0,nrow=3,ncol=100)
+
+for(simul in 1:100){
+  set.seed(simul)
+  # 경기수 난수 생성으로 train 설정
+  all_race <- 1:2101
+  index = sample(all_race, 1471)
+  train_sample <- data.frame("race" = all_race[index])
+  test_sample <- data.frame("race" = all_race[-index])
+  
+  # 생성한 난수와 merge하여 70% train data 생성 / 30% test data 생성
+  train_dan <- merge(dan_data, train_sample, by = "race")
+  test_dan <- merge(dan_data, test_sample, by = "race")
+  
+  # 로지스틱 회귀 모형 생성
+  dan_model_linear <- glm(formula(AIC), data = train_dan, family = "binomial")
+  
+  # 생성한 로지스틱 회귀 모형을 통한 test_dan의 순위 예측
+  pred <- predict(dan_model_linear, newdata = test_dan, type = "response")
+  
+  # 우승마 예측 회귀 자료를 기반으로 각 경기별로 가장 높은 우승 확률을 보이는 말을 우승마로 지정
+  # 각 경기 별로 가장 높은 확률은 1, 나머지는 0 (단승식)
+  
+  pprr <- as.data.frame(pred)
+  pprr$race <- test_dan$race
+  
+  pprr_rank_dan <- transform(pprr, race.rank = ave(pred, race, FUN = function(x) rank(-x, ties.method = "first")))
+  
+  pprr_rank_dan[3][pprr_rank_dan[3] != 1] <- 0
+  
+  test_dan$predord <- pprr_rank_dan$race.rank
+  
+  ## 우승마를 우승마로 예측한 확률, Specificity를 result_matrix에 append
+  # spec_logistic <- confusionMatrix(test_dan$ord, test_dan$predord)
+  # result_matrix[1,simul] <- spec_logistic$byClass[2]
+  
+  predict_sum = 0
+  
+  urace = unique(test_dan$race)
+  
+  for(i in urace){
+    x <- subset(test_dan, select = c(ord), subset = (race == i))
+    y <- subset(test_dan, select = c(predord), subset = (race == i))
+    if(all(x == y)){
+      predict_sum = predict_sum + 1
+    }
+  }
+  
+  accuracy = predict_sum/630
+  
+  result_matrix_test_linear[1,simul] <- accuracy
+  
+}
+
+
+
+
+```
+
+
+############### 복승식 #################
+```{r}
+
+### 로지스틱 ###
+
+null_model <- glm(ord ~ 1, data = bok_data)
+
+AIC <- step(null_model,scope = (ord ~ chulNo + age + wgBudam + rcCntY + ord1CntY + ord2CntY + rank + chaksunT + chaksunY + chaksun_6m  + trAge + rcCntY_tr + ord1CntY_tr + ord2CntY_tr + age_jk + wg_Budam_jk + rcCntY_jk + ord1CntY_jk + ord2CntY_jk + num_own + num_reg + num_cancel + chaksunT_ow + chaksunY_ow + ord1CntY_ow + ord2CntY_ow + ord3CntY_ow + rcCntY_ow + hr_ord1PerT + hr_ord2PerT + tr_ord1PerT + tr_ord2PerT + jk_ord1PerT + jk_ord2PerT + ow_ord1PerT + ow_ord2PerT + ow_ord3PerT + tr_career + jk_career + ow_career + sex_female + sex_gelding + sex_male + name_domestic + name_foreign), direction = "both")
+
+summary(AIC)
+
+
+for(simul in 1:100){
+  set.seed(simul)
+  # 경기수 난수 생성으로 train 설정
+  all_race <- 1:2101
+  index = sample(all_race, 1471)
+  train_sample <- data.frame("race" = all_race[index])
+  test_sample <- data.frame("race" = all_race[-index])
+  
+  # 생성한 난수와 merge하여 70% train data 생성 / 30% test data 생성
+  train_bok <- merge(bok_data, train_sample, by = "race")
+  test_bok <- merge(bok_data, test_sample, by = "race")
+  
+  # 로지스틱 회귀 모형 생성
+  bok_model_linear <- glm(formula(AIC), data = train_bok, family = "binomial")
+  
+  # 생성한 로지스틱 회귀 모형을 통한 test_dan의 순위 예측
+  pred <- predict(bok_model_linear, newdata = test_bok, type = "response")
+  
+  # 우승마 예측 회귀 자료를 기반으로 각 경기별로 가장 높은 우승 확률을 보이는 말을 우승마로 지정
+  # 각 경기 별로 가장 높은 확률은 1, 나머지는 0 (단승식)
+  
+  pprr <- as.data.frame(pred)
+  pprr$race <- test_bok$race
+  
+  pprr_rank_bok <- transform(pprr, race.rank = ave(pred, race, FUN = function(x) rank(-x, ties.method = "first")))
+  
+  pprr_rank_bok[3][pprr_rank_bok[3] == 2] <- 1
+  pprr_rank_bok[3][pprr_rank_bok[3] != 1] <- 0
+  
+  test_bok$predord <- pprr_rank_bok$race.rank
+  
+  ## 우승마를 우승마로 예측한 확률, Specificity를 result_matrix에 append
+  # spec_logistic_bok <- confusionMatrix(test_bok$ord, test_bok$predord)
+  # result_matrix[3,simul] <- spec_logistic_bok$byClass[2]
+  
+  predict_sum = 0
+  
+  urace = unique(test_bok$race)
+  
+  for(i in urace){
+    x <- subset(test_bok, select = c(ord), subset = (race == i))
+    y <- subset(test_bok, select = c(predord), subset = (race == i))
+    if(all(x == y)){
+      predict_sum = predict_sum + 1
+    }
+  }
+  
+  accuracy = predict_sum/630
+  
+  result_matrix_test_linear[2,simul] <- accuracy
+  
+}
+```
+
+
+##########삼복승식 ##########
+
+```{r}
+
+null_model <- glm(ord ~ 1, data = sam_data)
+
+AIC <- step(null_model,scope = (ord ~ chulNo + age + wgBudam + rcCntY + ord1CntY + ord2CntY + rank + chaksunT + chaksunY + chaksun_6m  + trAge + rcCntY_tr + ord1CntY_tr + ord2CntY_tr + age_jk + wg_Budam_jk + rcCntY_jk + ord1CntY_jk + ord2CntY_jk + num_own + num_reg + num_cancel + chaksunT_ow + chaksunY_ow + ord1CntY_ow + ord2CntY_ow + ord3CntY_ow + rcCntY_ow + hr_ord1PerT + hr_ord2PerT + tr_ord1PerT + tr_ord2PerT + jk_ord1PerT + jk_ord2PerT + ow_ord1PerT + ow_ord2PerT + ow_ord3PerT + tr_career + jk_career + ow_career + sex_female + sex_gelding + sex_male + name_domestic + name_foreign), direction = "both")
+
+summary(AIC)
+
+### 로지스틱 ###
+
+for(simul in 1:100){
+  set.seed(simul)
+  # 경기수 난수 생성으로 train 설정
+  all_race <- 1:2101
+  index = sample(all_race, 1471)
+  train_sample <- data.frame("race" = all_race[index])
+  test_sample <- data.frame("race" = all_race[-index])
+  
+  # 생성한 난수와 merge하여 70% train data 생성 / 30% test data 생성
+  train_sam <- merge(sam_data, train_sample, by = "race")
+  test_sam <- merge(sam_data, test_sample, by = "race")
+  
+  # 로지스틱 회귀 모형 생성
+  sam_model_linear <- glm(formula(AIC), data = train_sam, family = "binomial")
+  
+  # 생성한 로지스틱 회귀 모형을 통한 test_dan의 순위 예측
+  pred <- predict(sam_model_linear, newdata = test_sam, type = "response")
+  
+  # 우승마 예측 회귀 자료를 기반으로 각 경기별로 가장 높은 우승 확률을 보이는 말을 우승마로 지정
+  # 각 경기 별로 가장 높은 확률은 1, 나머지는 0 (단승식)
+  
+  pprr <- as.data.frame(pred)
+  pprr$race <- test_sam$race
+  
+  pprr_rank_sam <- transform(pprr, race.rank = ave(pred, race, FUN = function(x) rank(-x, ties.method = "first")))
+  
+  pprr_rank_sam[3][pprr_rank_sam[3] == 3] <- 1
+  pprr_rank_sam[3][pprr_rank_sam[3] == 2] <- 1
+  pprr_rank_sam[3][pprr_rank_sam[3] != 1] <- 0
+  
+  test_sam$predord <- pprr_rank_sam$race.rank
+  
+  ## 우승마를 우승마로 예측한 확률, Specificity를 result_matrix에 append
+  # spec_logistic_sam <- confusionMatrix(test_sam$ord, test_sam$predord)
+  # result_matrix[5,simul] <- spec_logistic_sam$byClass[2]
+  
+  predict_sum = 0
+  
+  urace = unique(test_sam$race)
+  
+  for(i in urace){
+    x <- subset(test_sam, select = c(ord), subset = (race == i))
+    y <- subset(test_sam, select = c(predord), subset = (race == i))
+    if(all(x == y)){
+      predict_sum = predict_sum + 1
+    }
+  }
+  
+  accuracy = predict_sum/630
+  
+  result_matrix_test_linear[3,simul] <- accuracy
+  
+}
+```
+
+
+
+```{r}
+result_matrix_test_linear
+mean(result_matrix_test_linear[1,])
+mean(result_matrix_test_linear[2,])
+mean(result_matrix_test_linear[3,])
+```
+
